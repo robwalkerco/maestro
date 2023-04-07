@@ -567,6 +567,7 @@ class AndroidDriver(
     }
 
     private fun setPermissionInternal(appId: String, permission: String, permissionValue: String) {
+        return
         try {
             dadb.shell("pm $permissionValue $appId $permission")
         } catch (exception: Exception) {

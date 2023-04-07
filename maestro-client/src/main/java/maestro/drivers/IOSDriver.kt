@@ -491,6 +491,7 @@ class IOSDriver(
     }
 
     override fun setPermissions(appId: String, permissions: Map<String, String>) {
+        return
         iosDevice.setPermissions(appId, permissions)
     }
 
