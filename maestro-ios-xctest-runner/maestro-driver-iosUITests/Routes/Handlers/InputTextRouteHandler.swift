@@ -6,7 +6,9 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier!,
                             category: String(describing: InputTextRouteHandler.self))
 @MainActor
 final class InputTextRouteHandler : HTTPHandler {
-    private let typingFrequency = 30
+    private let defaultTypingSpeed = 10
+    // in case of exceeding 50 symbols maestro will rely on copy-paste functionality
+    private let maxDefaultInputCharacters = 50
 
     func handleRequest(_ request: FlyingFox.HTTPRequest) async throws -> FlyingFox.HTTPResponse {
         let decoder = JSONDecoder()
@@ -19,9 +21,11 @@ final class InputTextRouteHandler : HTTPHandler {
             let start = Date()
 
             var eventPath = PointerEventPath.pathForTextInput()
-            eventPath.type(text: requestBody.text, typingSpeed: typingFrequency)
-            var eventRecord = EventRecord(orientation: .portrait)
-            eventRecord.add(eventPath)
+            let typingSpeed = calculateTypingSpeed(for: requestBody.text)
+            logger.info("Typing text \"\(requestBody.text)\" with speed \(typingSpeed) characters per second")
+            eventPath.type(text: requestBody.text, typingSpeed: typingSpeed)
+            let eventRecord = EventRecord(orientation: .portrait)
+            _ = eventRecord.add(eventPath)
             try await RunnerDaemonProxy().synthesize(eventRecord: eventRecord)
 
             let duration = Date().timeIntervalSince(start)
@@ -40,5 +44,16 @@ final class InputTextRouteHandler : HTTPHandler {
         """
         let errorData = Data(jsonString.utf8)
         return HTTPResponse(statusCode: HTTPStatusCode.badRequest, body: errorData)
+    }
+    
+    private func calculateTypingSpeed(for text: String) -> Int {
+        let maxCommandTimeSeconds = 5.0
+        let timeWithDefaultSpeed = Double(text.count) / Double(defaultTypingSpeed)
+
+        if timeWithDefaultSpeed < maxCommandTimeSeconds {
+            return defaultTypingSpeed
+        } else {
+            return Int((Double(text.count) / maxCommandTimeSeconds).rounded())
+        }
     }
 }
